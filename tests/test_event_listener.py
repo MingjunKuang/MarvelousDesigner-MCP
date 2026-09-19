@@ -2,6 +2,7 @@ import importlib.util
 import json
 from pathlib import Path
 import socket
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -117,7 +118,11 @@ class EventListenerTests(unittest.TestCase):
         self.assertTrue(self.response(conn)['result']['bye'])
         self.assertFalse(self.listener.running)
         self.assertFalse(self.listener.clients)
-        new = event.Listener({}, port=self.address[1])
+        self.assertEqual(self.listener.srv.fileno(), -1)
+        # Immediate same-port restart is a Windows bridge guarantee. POSIX
+        # retains accepted TCP connections in TIME_WAIT after active close.
+        port = self.address[1] if sys.platform == 'win32' else 0
+        new = event.Listener({}, port=port)
         new.stop()
 
     def test_capacity_bound(self):
