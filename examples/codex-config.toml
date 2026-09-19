@@ -1,0 +1,9 @@
+[mcp_servers.marvelous-designer]
+command = "md-mcp"
+args = ["serve"]
+startup_timeout_sec = 120
+tool_timeout_sec = 660
+
+[mcp_servers.marvelous-designer.env]
+MD_MCP_TIMEOUT = "600"
+PYTHONUTF8 = "1"

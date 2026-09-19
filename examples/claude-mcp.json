@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "marvelous-designer": {
+      "command": "md-mcp",
+      "args": ["serve"],
+      "env": {"MD_MCP_TIMEOUT": "600", "PYTHONUTF8": "1"}
+    }
+  }
+}

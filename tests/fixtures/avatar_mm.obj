@@ -1,0 +1,16 @@
+# Minimal closed avatar regression fixture. Units mm, Y up: 200 x 400 x 100.
+o AgentTestAvatar
+v -100 0 -50
+v 100 0 -50
+v 100 400 -50
+v -100 400 -50
+v -100 0 50
+v 100 0 50
+v 100 400 50
+v -100 400 50
+f 1 4 3 2
+f 5 6 7 8
+f 1 2 6 5
+f 4 8 7 3
+f 1 5 8 4
+f 2 3 7 6

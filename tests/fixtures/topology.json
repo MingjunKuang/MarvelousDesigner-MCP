@@ -1,0 +1,488 @@
+{
+  "raw": {
+    "ID": "KjLffT",
+    "CurrentFabricUUID": "cGZvkp",
+    "Name": "Agent_Curve_A",
+    "fGrainlineAngle": 0.0,
+    "strGrainlineOrientation": "One Way",
+    "IsClosed": true,
+    "strSuperImposeSide": "None",
+    "IsHalfSymmetric": false,
+    "ShapeInfo": {
+      "IsSlashed": false,
+      "LineList": [
+        {
+          "ID": "CeGyAv",
+          "PointList": [
+            {
+              "ID": "NcQ6eM",
+              "PointType": "Straight",
+              "GradingRuleID": 0,
+              "Position": {
+                "x": 0.0,
+                "y": 0.0
+              }
+            },
+            {
+              "ID": "tPAOpu",
+              "PointType": "Straight",
+              "GradingRuleID": 0,
+              "Position": {
+                "x": 120.0,
+                "y": 0.0
+              }
+            }
+          ]
+        },
+        {
+          "ID": "OEjMDS",
+          "PointList": [
+            {
+              "ID": "tPAOpu",
+              "PointType": "Straight",
+              "GradingRuleID": 0,
+              "Position": {
+                "x": 120.0,
+                "y": 0.0
+              }
+            },
+            {
+              "ID": "RqHIAz",
+              "PointType": "Polyline",
+              "GradingRuleID": 0,
+              "Position": {
+                "x": 140.0,
+                "y": 60.0
+              }
+            },
+            {
+              "ID": "19y5gM",
+              "PointType": "Straight",
+              "GradingRuleID": 0,
+              "Position": {
+                "x": 120.0,
+                "y": 120.0
+              }
+            }
+          ]
+        },
+        {
+          "ID": "KTSByr",
+          "PointList": [
+            {
+              "ID": "19y5gM",
+              "PointType": "Straight",
+              "GradingRuleID": 0,
+              "Position": {
+                "x": 120.0,
+                "y": 120.0
+              }
+            },
+            {
+              "ID": "5SpyzI",
+              "PointType": "Straight",
+              "GradingRuleID": 0,
+              "Position": {
+                "x": 0.0,
+                "y": 120.0
+              }
+            }
+          ]
+        },
+        {
+          "ID": "pe6145",
+          "PointList": [
+            {
+              "ID": "5SpyzI",
+              "PointType": "Straight",
+              "GradingRuleID": 0,
+              "Position": {
+                "x": 0.0,
+                "y": 120.0
+              }
+            },
+            {
+              "ID": "NcQ6eM",
+              "PointType": "Straight",
+              "GradingRuleID": 0,
+              "Position": {
+                "x": 0.0,
+                "y": 0.0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "InternalLineList": [
+      {
+        "LineList": [
+          {
+            "ID": "w1LF4n",
+            "PointList": [
+              {
+                "ID": "kPrFNf",
+                "PointType": "Straight",
+                "GradingRuleID": 0,
+                "Position": {
+                  "x": 20.0,
+                  "y": 20.0
+                }
+              },
+              {
+                "ID": "nH9IMK",
+                "PointType": "Straight",
+                "GradingRuleID": 0,
+                "Position": {
+                  "x": 80.0,
+                  "y": 20.0
+                }
+              }
+            ]
+          }
+        ],
+        "ID": "eMKbuD",
+        "ShapeType": 1,
+        "IsClosed": false,
+        "FoldData": {
+          "iAngle": 180,
+          "iStrength": 5,
+          "bRenderFolded": true
+        }
+      },
+      {
+        "LineList": [
+          {
+            "ID": "Ci5skM",
+            "PointList": [
+              {
+                "ID": "H4hZAE",
+                "PointType": "Straight",
+                "GradingRuleID": 0,
+                "Position": {
+                  "x": 20.0,
+                  "y": 40.0
+                }
+              },
+              {
+                "ID": "Z44QB9",
+                "PointType": "Polyline",
+                "GradingRuleID": 0,
+                "Position": {
+                  "x": 50.0,
+                  "y": 60.0
+                }
+              },
+              {
+                "ID": "FxR8cF",
+                "PointType": "Straight",
+                "GradingRuleID": 0,
+                "Position": {
+                  "x": 80.0,
+                  "y": 40.0
+                }
+              }
+            ]
+          }
+        ],
+        "ID": "MfZrAP",
+        "ShapeType": 1,
+        "IsClosed": false,
+        "FoldData": {
+          "iAngle": 180,
+          "iStrength": 5,
+          "bRenderFolded": true
+        }
+      },
+      {
+        "LineList": [
+          {
+            "ID": "iog2Gg",
+            "PointList": [
+              {
+                "ID": "dRzC4l",
+                "PointType": "Straight",
+                "GradingRuleID": 0,
+                "Position": {
+                  "x": 20.0,
+                  "y": 80.0
+                }
+              },
+              {
+                "ID": "Qhu71k",
+                "PointType": "Straight",
+                "GradingRuleID": 0,
+                "Position": {
+                  "x": 60.0,
+                  "y": 80.0
+                }
+              }
+            ]
+          },
+          {
+            "ID": "zm8M9O",
+            "PointList": [
+              {
+                "ID": "Qhu71k",
+                "PointType": "Straight",
+                "GradingRuleID": 0,
+                "Position": {
+                  "x": 60.0,
+                  "y": 80.0
+                }
+              },
+              {
+                "ID": "kH0yhb",
+                "PointType": "Straight",
+                "GradingRuleID": 0,
+                "Position": {
+                  "x": 60.0,
+                  "y": 100.0
+                }
+              }
+            ]
+          },
+          {
+            "ID": "KmxPtu",
+            "PointList": [
+              {
+                "ID": "kH0yhb",
+                "PointType": "Straight",
+                "GradingRuleID": 0,
+                "Position": {
+                  "x": 60.0,
+                  "y": 100.0
+                }
+              },
+              {
+                "ID": "EgvZpl",
+                "PointType": "Straight",
+                "GradingRuleID": 0,
+                "Position": {
+                  "x": 20.0,
+                  "y": 100.0
+                }
+              }
+            ]
+          },
+          {
+            "ID": "SoKNQy",
+            "PointList": [
+              {
+                "ID": "EgvZpl",
+                "PointType": "Straight",
+                "GradingRuleID": 0,
+                "Position": {
+                  "x": 20.0,
+                  "y": 100.0
+                }
+              },
+              {
+                "ID": "dRzC4l",
+                "PointType": "Straight",
+                "GradingRuleID": 0,
+                "Position": {
+                  "x": 20.0,
+                  "y": 80.0
+                }
+              }
+            ]
+          }
+        ],
+        "ID": "JhmMH4",
+        "ShapeType": 1,
+        "IsClosed": true,
+        "FoldData": {
+          "iAngle": 180,
+          "iStrength": 5,
+          "bRenderFolded": true
+        }
+      }
+    ],
+    "ButtonHeadList": [],
+    "ButtonHoleList": [],
+    "NotchList": [],
+    "AnnotationList": [],
+    "ArrangementPointDataMap": {
+      "PointName": "Arrangement Point",
+      "fOffSetX": 0.0,
+      "fOffSetY": 0.0,
+      "fAngle": 0.0
+    },
+    "OuterSeamAllowanceList": []
+  },
+  "native": {
+    "Children Information": [
+      {
+        "Children shape count": "3"
+      },
+      {
+        "LineList": [
+          {
+            "Line count": "1"
+          },
+          {
+            "Line index": "0",
+            "Line length": 60,
+            "Line type": "Straight type"
+          }
+        ],
+        "PointList": [
+          {
+            "Point count": "2"
+          },
+          {
+            "Point index": "0",
+            "Point positionX": 20,
+            "Point positionY": 20
+          },
+          {
+            "Point index": "1",
+            "Point positionX": 80,
+            "Point positionY": 20
+          }
+        ],
+        "Shape index": "0",
+        "Shape name": "Agent_Curve_A",
+        "Shape type": "InnerShape"
+      },
+      {
+        "LineList": [
+          {
+            "Line count": "1"
+          },
+          {
+            "Line index": "0",
+            "Line length": 73.79141235351562,
+            "Line type": ""
+          }
+        ],
+        "PointList": [
+          {
+            "Point count": "2"
+          },
+          {
+            "Point index": "0",
+            "Point positionX": 20,
+            "Point positionY": 40
+          },
+          {
+            "Point index": "1",
+            "Point positionX": 80,
+            "Point positionY": 40
+          }
+        ],
+        "Shape index": "1",
+        "Shape name": "Agent_Curve_A",
+        "Shape type": "InnerShape"
+      },
+      {
+        "LineList": [
+          {
+            "Line count": "4"
+          },
+          {
+            "Line index": "0",
+            "Line length": 40,
+            "Line type": "Straight type"
+          },
+          {
+            "Line index": "1",
+            "Line length": 20,
+            "Line type": "Straight type"
+          },
+          {
+            "Line index": "2",
+            "Line length": 40,
+            "Line type": "Straight type"
+          },
+          {
+            "Line index": "3",
+            "Line length": 20,
+            "Line type": "Straight type"
+          }
+        ],
+        "PointList": [
+          {
+            "Point count": "4"
+          },
+          {
+            "Point index": "0",
+            "Point positionX": 20,
+            "Point positionY": 80
+          },
+          {
+            "Point index": "1",
+            "Point positionX": 60,
+            "Point positionY": 80
+          },
+          {
+            "Point index": "2",
+            "Point positionX": 60,
+            "Point positionY": 100
+          },
+          {
+            "Point index": "3",
+            "Point positionX": 20,
+            "Point positionY": 100
+          }
+        ],
+        "Shape index": "2",
+        "Shape name": "Agent_Curve_A",
+        "Shape type": "InnerShape"
+      }
+    ],
+    "LineList": [
+      {
+        "Line count": "4"
+      },
+      {
+        "Line index": "0",
+        "Line length": 120,
+        "Line type": "Straight type"
+      },
+      {
+        "Line index": "1",
+        "Line length": 127.6525115966797,
+        "Line type": ""
+      },
+      {
+        "Line index": "2",
+        "Line length": 120,
+        "Line type": "Straight type"
+      },
+      {
+        "Line index": "3",
+        "Line length": 120,
+        "Line type": "Straight type"
+      }
+    ],
+    "Pattern index": "0",
+    "Pattern name": "Agent_Curve_A",
+    "PointList": [
+      {
+        "Point count": "4"
+      },
+      {
+        "Point index": "0",
+        "Point positionX": 0,
+        "Point positionY": 0
+      },
+      {
+        "Point index": "1",
+        "Point positionX": 120,
+        "Point positionY": 0
+      },
+      {
+        "Point index": "2",
+        "Point positionX": 120,
+        "Point positionY": 120
+      },
+      {
+        "Point index": "3",
+        "Point positionX": 0,
+        "Point positionY": 120
+      }
+    ]
+  }
+}
