@@ -4,8 +4,18 @@ No worker calls MD APIs and no nested event pump is introduced. Each timer turn
 dispatches at most one request. A synchronous MD API still occupies the GUI for
 its own duration. Timer callbacks remain rooted until process exit because
 KillTimer does not remove already posted WM_TIMER messages.
+
+CLIENT_TIMEOUT bounds how long a peer may take to send a complete request and to
+read its response. Once a request is complete it is queued without a deadline,
+so a long API call cannot make the requests waiting behind it expire. At most
+MAX_QUEUED complete requests may wait; further ones get a "busy" error at once
+and are not executed.
+
+When a token is configured, every request (including ping and shutdown) must
+carry it in a top-level "token" field; otherwise it is rejected unexecuted.
 """
 import ctypes
+import hmac
 import json
 import socket
 import sys
@@ -15,6 +25,7 @@ import traceback
 MAX_REQUEST = 16 * 1024 * 1024
 MAX_RESPONSE = 32 * 1024 * 1024
 MAX_CLIENTS = 8
+MAX_QUEUED = 4
 IO_CHUNK = 65536
 CLIENT_TIMEOUT = 15
 STATE_KEY = '_md_mcp_event_listener'
@@ -22,8 +33,9 @@ ROOTS_KEY = '_md_mcp_timer_roots'
 
 
 class Listener:
-    def __init__(self, handlers, host='127.0.0.1', port=7421):
+    def __init__(self, handlers, host='127.0.0.1', port=7421, token=None):
         self.handlers = handlers
+        self.token = token
         self.clients = {}
         self.running = False
         self.busy = False
@@ -50,7 +62,8 @@ class Listener:
         return dict(mode='windows_main_thread_timer', running=self.running,
                     owner_thread=self.owner_thread, callback_thread=self.callback_thread,
                     ticks=self.ticks, calls=self.calls, clients=len(self.clients),
-                    last_error=self.last_error, interval_ms=25)
+                    queued=sum(1 for s in self.clients.values() if s['queued']),
+                    auth=self.token is not None, last_error=self.last_error, interval_ms=25)
 
     def install_timer(self):
         if sys.platform != 'win32':
@@ -111,6 +124,11 @@ class Listener:
             if not isinstance(req, dict):
                 raise ValueError('request must be an object')
             req_id = req.get('id')
+            if self.token is not None:
+                supplied = req.get('token')
+                if not isinstance(supplied, str) or not hmac.compare_digest(supplied.encode(), self.token.encode()):
+                    return {'id': req_id, 'code': 'unauthorized',
+                            'error': 'unauthorized: missing or wrong listener token'}, False
             method = req.get('method')
             params = req.get('params', {})
             if not isinstance(method, str) or not isinstance(params, dict):
@@ -127,6 +145,22 @@ class Listener:
         except Exception:
             return {'id': req_id, 'error': traceback.format_exc()}, False
 
+    @staticmethod
+    def encode(response):
+        try:
+            output = (json.dumps(response) + '\n').encode('utf-8')
+        except (TypeError, ValueError):
+            output = (json.dumps({'id': response.get('id'), 'error': 'Result is not JSON serializable'}) + '\n').encode()
+        if len(output) > MAX_RESPONSE:
+            output = (json.dumps({'id': response.get('id'), 'error': 'Response exceeds 32 MiB'}) + '\n').encode()
+        return output
+
+    def reply(self, state, response):
+        state['out'] = self.encode(response)
+        state['data'].clear()
+        state['queued'] = False
+        state['deadline'] = time.monotonic() + CLIENT_TIMEOUT   # time allowed to read the response
+
     def poll(self):
         if not self.running or self.busy:
             return
@@ -140,19 +174,14 @@ class Listener:
                 except BlockingIOError:
                     break
                 conn.setblocking(False)
-                self.clients[conn] = dict(data=bytearray(), out=None, sent=0,
+                self.clients[conn] = dict(data=bytearray(), out=None, sent=0, queued=False,
                                           deadline=time.monotonic() + CLIENT_TIMEOUT, stop=False)
             dispatched = False
             for conn, state in list(self.clients.items()):
-                if time.monotonic() > state['deadline']:
-                    stop = state['stop']
-                    self.close_client(conn)
-                    if stop:
-                        self.stop()
-                        return
-                    continue
                 try:
-                    if state['out'] is None:
+                    # Read first, check the deadline second: bytes that arrived while an
+                    # earlier request in this same tick was running must still count.
+                    if state['out'] is None and not state['queued']:
                         chunk = None
                         if b'\n' not in state['data']:
                             try:
@@ -167,18 +196,31 @@ class Listener:
                         if len(state['data']) > MAX_REQUEST:
                             self.close_client(conn)
                             continue
-                        if not dispatched and b'\n' in state['data']:
-                            response, state['stop'] = self.dispatch(bytes(state['data']).split(b'\n', 1)[0])
-                            dispatched = True
-                            try:
-                                output = (json.dumps(response) + '\n').encode('utf-8')
-                            except (TypeError, ValueError):
-                                output = (json.dumps({'id': response.get('id'), 'error': 'Result is not JSON serializable'}) + '\n').encode()
-                            if len(output) > MAX_RESPONSE:
-                                output = (json.dumps({'id': response.get('id'), 'error': 'Response exceeds 32 MiB'}) + '\n').encode()
-                            state['out'] = output
-                            state['data'].clear()
-                            state['deadline'] = time.monotonic() + CLIENT_TIMEOUT
+                        if b'\n' in state['data']:
+                            waiting = sum(1 for s in self.clients.values() if s['queued'])
+                            if waiting >= MAX_QUEUED:
+                                req_id = None
+                                try:
+                                    req_id = json.loads(bytes(state['data']).split(b'\n', 1)[0]).get('id')
+                                except Exception:
+                                    pass
+                                self.reply(state, {'id': req_id, 'code': 'busy', 'error':
+                                                   'listener busy: %d requests already queued; not executed' % waiting})
+                            else:
+                                # Complete request: wait for its turn without a deadline.
+                                state['queued'] = True
+                                state['deadline'] = None
+                    if state['deadline'] is not None and time.monotonic() > state['deadline']:
+                        stop = state['stop']
+                        self.close_client(conn)
+                        if stop:
+                            self.stop()
+                            return
+                        continue
+                    if state['queued'] and not dispatched:
+                        response, state['stop'] = self.dispatch(bytes(state['data']).split(b'\n', 1)[0])
+                        dispatched = True
+                        self.reply(state, response)
                     if state['out'] is not None:
                         start = state['sent']
                         try:
@@ -199,11 +241,11 @@ class Listener:
             self.busy = False
 
 
-def start(handlers, host='127.0.0.1', port=7421):
+def start(handlers, host='127.0.0.1', port=7421, token=None):
     previous = getattr(sys, STATE_KEY, None)
     if previous is not None and previous.running:
         return previous.status()
-    listener = Listener(handlers, host, port)
+    listener = Listener(handlers, host, port, token)
     try:
         listener.install_timer()
     except BaseException:

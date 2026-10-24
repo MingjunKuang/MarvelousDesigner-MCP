@@ -3,12 +3,19 @@ import json
 from pathlib import Path
 import socket
 import sys
+import time
 import unittest
 from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('event_listener', Path(__file__).resolve().parents[1] / 'md_addon/md_event_listener.py')
 event = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(event)
+
+
+def settle():
+    # Let loopback connects and bytes land before the next single poll. Without this a
+    # poll can run before the data arrives and the test races (seen intermittently).
+    time.sleep(0.03)
 
 
 class EventListenerTests(unittest.TestCase):
@@ -23,6 +30,7 @@ class EventListenerTests(unittest.TestCase):
         self.addCleanup(conn.close)
         if data:
             conn.sendall(data)
+        settle()
         return conn
 
     def request(self, method='ping', params=None):
@@ -31,7 +39,10 @@ class EventListenerTests(unittest.TestCase):
     def response(self, conn):
         buf = b''
         while b'\n' not in buf:
-            buf += conn.recv(65536)
+            chunk = conn.recv(65536)
+            if not chunk:
+                raise AssertionError('connection closed without a response')
+            buf += chunk
         return json.loads(buf)
 
     def test_idle_and_partial_peer_do_not_block_other_requests(self):
@@ -41,6 +52,7 @@ class EventListenerTests(unittest.TestCase):
         self.assertTrue(self.response(conn)['result']['pong'])
         self.assertEqual(len(self.listener.clients), 1)
         partial.sendall(b'"partial", "method":"ping"}\n')
+        settle()
         self.listener.poll()
         self.assertEqual(self.response(partial)['id'], 'partial')
 
@@ -67,6 +79,7 @@ class EventListenerTests(unittest.TestCase):
     def test_half_closed_peer_preserves_queued_complete_request(self):
         first, second = self.request('record'), self.request('record')
         second.shutdown(socket.SHUT_WR)
+        settle()
         self.listener.poll()
         self.listener.poll()
         self.assertEqual(self.response(first)['result'], {})
@@ -86,6 +99,7 @@ class EventListenerTests(unittest.TestCase):
         state = next(iter(self.listener.clients.values()))
         state['deadline'] = 0
         conn.sendall(b' ')
+        settle()
         self.listener.poll()
         self.assertEqual(len(self.listener.clients), 0)
 
@@ -131,6 +145,55 @@ class EventListenerTests(unittest.TestCase):
         self.listener.poll()
         self.assertEqual(len(self.listener.clients), event.MAX_CLIENTS)
 
+    def test_queued_request_survives_a_long_call(self):
+        # Both requests are complete before the first poll; the first call "takes" longer
+        # than CLIENT_TIMEOUT, yet the queued second request must still run.
+        first, second = self.request('record', {'n': 1}), self.request('record', {'n': 2})
+        self.listener.poll()
+        self.assertEqual(len(self.calls), 1)
+        later = event.time.monotonic() + event.CLIENT_TIMEOUT * 10
+        with patch.object(event.time, 'monotonic', return_value=later):
+            self.listener.poll()
+        self.assertEqual(self.response(first)['result'], {'n': 1})
+        self.assertEqual(self.response(second)['result'], {'n': 2})
+        self.assertEqual(len(self.calls), 2)
+
+    def test_request_arriving_during_a_long_call_in_the_same_tick_is_kept(self):
+        # Live failure in MD: both connections are accepted in one tick, the first runs
+        # longer than CLIENT_TIMEOUT, then the second was expired before being read.
+        clock = [event.time.monotonic()]
+        def slow(params):
+            clock[0] += event.CLIENT_TIMEOUT * 2
+            return 'slow done'
+        self.listener.handlers['slow'] = slow
+        with patch.object(event.time, 'monotonic', side_effect=lambda: clock[0]):
+            first = self.request('slow')
+            second = self.request('record', {'n': 2})
+            self.listener.poll()
+            self.listener.poll()
+        self.assertEqual(self.response(first)['result'], 'slow done')
+        self.assertEqual(self.response(second)['result'], {'n': 2})
+
+    def test_incomplete_request_still_expires_while_others_queue(self):
+        partial = self.connect(b'{"id":')
+        self.listener.poll()
+        later = event.time.monotonic() + event.CLIENT_TIMEOUT + 1
+        with patch.object(event.time, 'monotonic', return_value=later):
+            self.listener.poll()
+        self.assertEqual(len(self.listener.clients), 0)
+
+    def test_full_queue_answers_busy_without_executing(self):
+        with patch.object(event, 'MAX_QUEUED', 1):
+            clients = [self.request('record', {'n': n}) for n in range(3)]
+            self.listener.poll()
+            busy = self.response(clients[2])
+            self.assertEqual(busy['code'], 'busy')
+            self.assertEqual(len(self.calls), 1)
+            self.listener.poll()
+        self.assertEqual(self.response(clients[0])['result'], {'n': 0})
+        self.assertEqual(self.response(clients[1])['result'], {'n': 1})
+        self.assertEqual([c['n'] for c in self.calls], [0, 1])
+
     def test_unserializable_handler_response_recovers(self):
         self.listener.handlers['bad'] = lambda p: {1, 2}
         conn = self.request('bad')
@@ -139,6 +202,48 @@ class EventListenerTests(unittest.TestCase):
         conn = self.request()
         self.listener.poll()
         self.assertTrue(self.response(conn)['result']['pong'])
+
+
+class TokenTests(unittest.TestCase):
+    def setUp(self):
+        self.calls = []
+        self.listener = event.Listener({'record': lambda p: self.calls.append(p) or p}, port=0, token='s3cret')
+        self.address = self.listener.srv.getsockname()
+        self.addCleanup(self.listener.stop)
+
+    def ask(self, request):
+        conn = socket.create_connection(self.address, timeout=1)
+        self.addCleanup(conn.close)
+        conn.sendall((json.dumps(request) + '\n').encode())
+        settle()
+        self.listener.poll()
+        buf = b''
+        while b'\n' not in buf:
+            chunk = conn.recv(65536)
+            if not chunk:
+                raise AssertionError('connection closed without a response')
+            buf += chunk
+        return json.loads(buf)
+
+    def test_missing_or_wrong_token_is_rejected_unexecuted(self):
+        for token in (None, 'wrong', 123):
+            request = dict(id='t', method='record', params={'x': 1})
+            if token is not None:
+                request['token'] = token
+            response = self.ask(request)
+            self.assertEqual(response['code'], 'unauthorized')
+            self.assertEqual(response['id'], 't')
+        self.assertEqual(self.calls, [])
+
+    def test_ping_and_shutdown_need_the_token_too(self):
+        self.assertEqual(self.ask(dict(id='p', method='ping'))['code'], 'unauthorized')
+        self.assertEqual(self.ask(dict(id='s', method='shutdown'))['code'], 'unauthorized')
+        self.assertTrue(self.listener.running)
+
+    def test_correct_token_runs(self):
+        response = self.ask(dict(id='ok', method='record', params={'x': 1}, token='s3cret'))
+        self.assertEqual(response['result'], {'x': 1})
+        self.assertTrue(self.ask(dict(id='p', method='ping', token='s3cret'))['result']['listener']['auth'])
 
 
 if __name__ == '__main__':

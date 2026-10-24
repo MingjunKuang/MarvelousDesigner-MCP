@@ -5,7 +5,7 @@ from pathlib import Path
 import socket
 import statistics
 import time
-from marvelous_designer_mcp.bridge import call
+from marvelous_designer_mcp.bridge import call, read_token
 
 root = Path(__file__).resolve().parents[1]
 results = {'started': time.strftime('%Y-%m-%dT%H:%M:%S')}
@@ -22,8 +22,14 @@ with socket.create_connection(('127.0.0.1', 7421), timeout=3) as partial:
     t = time.monotonic()
     assert call('ping', timeout=3)['pong']
     results['partial_peer_ping_ms'] = (time.monotonic() - t) * 1000
-    partial.sendall(b'"ping","id":"partial"}\n')
+    partial.sendall(('"ping","id":"partial","token":%s}\n' % json.dumps(read_token())).encode())
     results['fragmented_response'] = json.loads(partial.recv(65536))
+    assert results['fragmented_response']['result']['pong']
+
+with socket.create_connection(('127.0.0.1', 7421), timeout=3) as conn:
+    conn.sendall(b'{"id":"no-token","method":"ping"}\n')
+    results['no_token_response'] = json.loads(conn.recv(65536))
+    assert results['no_token_response'].get('code') == 'unauthorized', results['no_token_response']
 
 for raw in [b'bad\n', b'[]\n', b'\xff\n', b'{"method":[]}\n']:
     with socket.create_connection(('127.0.0.1', 7421), timeout=3) as conn:

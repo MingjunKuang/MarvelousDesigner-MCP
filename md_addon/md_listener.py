@@ -7,8 +7,14 @@ that fallback freezes the GUI until a shutdown request arrives.
 Install using md-mcp install-plugin and run the registered md_start_listener entry.
 
 Wire protocol: one JSON object per line over TCP 127.0.0.1:7421.
-    Request:  {"id": str, "method": str, "params": dict}
-    Response: {"id": str, "result": any}  or  {"id": str, "error": str}
+    Request:  {"id": str, "method": str, "params": dict, "token": str}
+    Response: {"id": str, "result": any}  or  {"id": str, "error": str[, "code": str]}
+
+Authentication: md_start_listener writes a fresh random token to
+<data dir>/listener.token each time it starts a new listener; requests without
+that token are rejected unexecuted. The file lives in the per-user data
+directory, so it guards against other accounts and processes that cannot read
+the user's files, not against code already running as the same user.
 
 Note: MD's API is exposed as importable modules (import_api, export_api,
 fabric_api, pattern_api, utility_api, ...), NOT as globals. Code sent via
@@ -18,13 +24,29 @@ name called `result`.
 from __future__ import annotations
 
 import contextlib
+import hmac
 import io
 import json
+import os
+import secrets
 import socket
 import traceback
+from pathlib import Path
 
 HOST = "127.0.0.1"
 PORT = 7421
+TOKEN_FILE = "listener.token"
+
+
+def write_token(data_dir) -> str:
+    """Create a new random token and store it atomically in <data_dir>/listener.token."""
+    path = Path(data_dir) / TOKEN_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    token = secrets.token_urlsafe(32)
+    temp = path.with_name(path.name + ".tmp")
+    temp.write_text(token, encoding="utf-8")
+    os.replace(temp, path)
+    return token
 
 # Persists across execute_python calls within one listener session.
 _persistent_globals: dict = {"__name__": "__md_mcp__"}
@@ -72,7 +94,7 @@ def _read_line(conn: socket.socket) -> bytes | None:
     return bytes(buf).split(b"\n", 1)[0]
 
 
-def _serve_conn(conn: socket.socket) -> bool:
+def _serve_conn(conn: socket.socket, token: str | None = None) -> bool:
     """Handle one request on one connection. Returns False iff shutdown was requested.
 
     The MCP-side bridge opens a fresh connection per call, so one request per
@@ -90,6 +112,11 @@ def _serve_conn(conn: socket.socket) -> bool:
             return True
 
         req_id = req.get("id")
+        supplied = req.get("token")
+        if token is not None and not (isinstance(supplied, str) and hmac.compare_digest(supplied.encode(), token.encode())):
+            conn.sendall((json.dumps({"id": req_id, "code": "unauthorized",
+                                      "error": "unauthorized: missing or wrong listener token"}) + "\n").encode())
+            return True
         method = req.get("method")
         if method == "shutdown":
             conn.sendall((json.dumps({"id": req_id, "result": {"bye": True}}) + "\n").encode())
@@ -107,13 +134,13 @@ def _serve_conn(conn: socket.socket) -> bool:
         return True
 
 
-def serve_forever() -> dict:
+def serve_forever(token: str | None = None) -> dict:
     """Compatibility entry point: start the GUI timer and return its status."""
     from md_event_listener import start
-    return start(HANDLERS, HOST, PORT)
+    return start(HANDLERS, HOST, PORT, token)
 
 
-def serve_blocking() -> None:
+def serve_blocking(token: str | None = None) -> None:
     """Blocking listener loop. Call this from MD's Python Editor.
 
     Blocks the MD GUI until a client sends {"method": "shutdown"}.
@@ -133,7 +160,7 @@ def serve_blocking() -> None:
             while True:
                 conn, _addr = srv.accept()
                 try:
-                    keep_going = _serve_conn(conn)
+                    keep_going = _serve_conn(conn, token)
                 except Exception:
                     traceback.print_exc()
                     keep_going = True

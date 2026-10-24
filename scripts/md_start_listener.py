@@ -8,6 +8,9 @@ Starts a nonblocking Windows GUI-thread timer listener on 127.0.0.1:7421.
 The plugin returns immediately. Synchronous API calls still occupy the GUI
 for their own duration. Stop it with the `shutdown_listener` MCP tool.
 
+Each new listener writes a fresh random token to <data dir>/listener.token;
+the MCP bridge sends it with every request and others are rejected.
+
 Repeated clicks reuse the active listener. Stop it before relaunching to pick up
 code edits; restarting MD is not required.
 
@@ -58,7 +61,10 @@ try:
     if _previous is None or not _previous.running:
         importlib.reload(md_listener)
         importlib.reload(md_event_listener)
-    _status = md_listener.serve_forever()
+        # New listener: new token. Clients read it from <data dir>/listener.token.
+        _status = md_listener.serve_forever(md_listener.write_token(_DATA_DIR))
+    else:
+        _status = md_listener.serve_forever()   # reuses the running listener and its token
     _log('GUI timer listener started: ' + repr(_status))
 except Exception:
     _log("LISTENER LAUNCH FAILED:\n" + traceback.format_exc())

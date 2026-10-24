@@ -1,10 +1,25 @@
 import json
+import os
 import socket
 import uuid
 import time
 from typing import Any
 
 from .config import MD_HOST, MD_PORT, MD_TIMEOUT
+from .paths import DATA_DIR
+
+TOKEN_FILE = 'listener.token'
+
+
+def read_token() -> str | None:
+    """Listener token: MD_MCP_TOKEN, else <data dir>/listener.token (rewritten on every listener start)."""
+    env = os.environ.get('MD_MCP_TOKEN')
+    if env:
+        return env.strip()
+    try:
+        return (DATA_DIR / TOKEN_FILE).read_text(encoding='utf-8').strip() or None
+    except OSError:
+        return None
 
 
 class BridgeError(RuntimeError):
@@ -32,14 +47,17 @@ def call(method: str, params: dict[str, Any] | None = None, *, timeout: float | 
     """Send a JSON request to the MD listener and return the result.
 
     Wire format: one JSON object per line.
-    Request:  {"id": str, "method": str, "params": dict}
-    Response: {"id": str, "result": any} or {"id": str, "error": str}
+    Request:  {"id": str, "method": str, "params": dict, "token": str}
+    Response: {"id": str, "result": any} or {"id": str, "error": str[, "code": str]}
     """
     payload = {
         "id": uuid.uuid4().hex,
         "method": method,
         "params": params or {},
     }
+    token = read_token()
+    if token:
+        payload["token"] = token
     data = (json.dumps(payload) + "\n").encode("utf-8")
 
     seconds = MD_TIMEOUT if timeout is None else timeout
@@ -73,5 +91,14 @@ def call(method: str, params: dict[str, Any] | None = None, *, timeout: float | 
         raise BridgeError('Invalid response envelope or request ID', 'protocol_error')
 
     if "error" in resp:
+        code = resp.get("code")
+        if code == 'unauthorized':
+            raise BridgeError(str(resp["error"]), 'unauthorized', outcome='not_executed', retry_safe=True,
+                token_file=str(DATA_DIR / TOKEN_FILE), token_present=bool(token),
+                guidance='The listener rejected the token. Restart it in MD (Plugins > Plug-in > md_start_listener) '
+                         'so it writes a fresh token, and make sure MD_MCP_DATA_DIR matches the plugin data directory.')
+        if code == 'busy':
+            raise BridgeError(str(resp["error"]), 'listener_busy', outcome='not_executed', retry_safe=True,
+                guidance='Too many requests are already waiting. Retry after the running call finishes.')
         raise BridgeError(str(resp["error"]), 'md_exception')
     return resp.get("result")
